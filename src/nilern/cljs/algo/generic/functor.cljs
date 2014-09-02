@@ -19,31 +19,59 @@
           "Applies function f to each item in the data structure s and returns
            a structure of the same kind."
           {:arglists '([f s])}
-          (fn [f s] (type s)))
+          (fn [f s] (if (fn? s)
+                      cljs.core/IFn
+                      (type s))))
+; Using fn? is hacky, but unlike on the JVM (= (isa? IFn (type #())) false) and
+; (like on the JVM) (type #()) doesn't return a type that would fit a defmethod.
+; Maybe you could find a better way?
 
-(defmethod fmap IList
+(defmethod fmap cljs.core/List
            [f v]
            (map f v))
 
-(defmethod fmap IVector
+(defmethod fmap cljs.core/PersistentVector
            [f v]
            (into (empty v) (map f v)))
 
-(defmethod fmap IMap
+(defn- map-fmap
+       [f m]
+       (into (empty m) (for [[k v] m] [k (f v)])))
+
+(defmethod fmap cljs.core/PersistentHashMap
            [f m]
-           (into (empty m) (for [[k v] m] [k (f v)])))
+           (map-fmap f m))
 
-(defmethod fmap ISet
+(defmethod fmap cljs.core/PersistentTreeMap
+           [f m]
+           (map-fmap f m))
+
+(defmethod fmap cljs.core/PersistentArrayMap
+           [f m]
+           (map-fmap f m))
+
+(defn- set-fmap
+       [f s]
+       (into (empty s) (map f s)))
+
+(defmethod fmap cljs.core/PersistentHashSet
            [f s]
-           (into (empty s) (map f s)))
+           (set-fmap f s))
 
-(defmethod fmap IFn
+(defmethod fmap cljs.core/PersistentTreeSet
+           [f s]
+           (set-fmap f s))
+
+(defmethod fmap cljs.core/IFn
            [f fn]
            (comp f fn))
 
-(prefer-method fmap IVector IFn)
-(prefer-method fmap IMap IFn)
-(prefer-method fmap ISet IFn)
+(prefer-method fmap cljs.core/PersistentVector cljs.core/IFn)
+(prefer-method fmap cljs.core/PersistentHashMap cljs.core/IFn)
+(prefer-method fmap cljs.core/PersistentTreeMap cljs.core/IFn)
+(prefer-method fmap cljs.core/PersistentArrayMap cljs.core/IFn)
+(prefer-method fmap cljs.core/PersistentHashSet cljs.core/IFn)
+(prefer-method fmap cljs.core/PersistentTreeSet cljs.core/IFn)
 
 (defmethod fmap LazySeq
            [f s]
